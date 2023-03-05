@@ -320,30 +320,30 @@ class SpaceWars:
 
                 self.draw_infos()
 
-if time.time() > self.hit_time + 1:
+                if time.time() > self.hit_time + 1:
                     self.has_been_hit = False
-if self.has_been_hit:
+                if self.has_been_hit:
                     self.time_elapsed_since_last_shake += dt
                     # dt is measured in milliseconds, therefore 250 ms = 0.25 seconds
                     if self.time_elapsed_since_last_shake > 100:
                         self.draw_has_been_hit_screen ()
 
                 #!Нарисованое Окно
-pygame.display.update ()
-
-dt = self.clock.tick (self.fps)
-
-self.game_over_screen()
 
 
-def init_warp_mode(self):
+                dt = self.clock.tick (self.fps)
+
+                self.game_over_screen()
+
+
+    def init_warp_mode(self):
         for enemy in self.enemy_objects:
             enemy.set_fly_by_mode(multi=2)
         for star in self.background_stars:
             self.background_stars.remove(star)
 
 
-def draw_has_been_hit_screen(self):
+    def draw_has_been_hit_screen(self):
 
         pygame.draw.lines(self.window, RED, True,
                           [(0, 0), (WINDOWWIDTH, 0), (WINDOWWIDTH, WINDOWHEIGHT), (0, WINDOWHEIGHT)], 5)
@@ -366,7 +366,7 @@ def draw_has_been_hit_screen(self):
 
         pygame.display.update()
 
-def draw_infos(self):
+    def draw_infos(self):
         font = pygame.font.SysFont("Arial", 18)
 
         text = "Score: " + str(self.score)
@@ -381,7 +381,7 @@ def draw_infos(self):
         renderText = font.render(text, True, WHITE)
         self.window.blit(renderText, (WINDOWWIDTH - 100, WINDOWHEIGHT - 30))
 
-def game_over_screen (self):
+    def game_over_screen (self):
         try:
             with open("highscore.txt", "r") as hs_file:
                 hs = int(hs_file.read())
@@ -608,7 +608,7 @@ class Explosion(Sprite):
 
         self.rect = pygame.Rect(init_x_pos, init_y_pos, self.size, self.size)
 
-def update(self):
+    def update(self):
         self.rect.x += self.y_speed
         self.rect.y += self.x_speed
         self.life -= 1
@@ -640,5 +640,5 @@ class Crack(Sprite):
         self.life = 100
 
 
-if name == "main":
-    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
+        if name == "menu":
+            space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
