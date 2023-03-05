@@ -1,0 +1,644 @@
+import pygame, sys, time
+from pygame.locals import *
+from pygame.sprite import Sprite
+import random
+
+colorPals = {"yellows": [(225,220,13), (240,235,0), (255,249,0), (242,238,85), (249,246,92)],
+             "greens": [(8,108,2), (71,106,55), (23,179,38), (68,132,90), (16,168,46)],
+             "reds": [(255, 160, 122), (255, 99, 71), (205, 92, 92), (139, 0, 0), (255, 0, 0)],
+             "blues":[(1,31,75), (3,57,108), (0,91,150), (100,151,177), (179,205,224)],
+             "violets":[(148, 0, 211), (238, 130, 238), (255, 0, 255), (255, 20, 147), (220, 20, 60)],
+             "white": [(0, 0, 0)]}
+
+WINDOWWIDTH = 1000
+WINDOWHEIGHT = 600
+
+BLACK = (0, 0, 0)
+WHITE = (255,255,255)
+RED = (255,0,0)
+YELLOW = (200,200,10)
+
+FIRE0 = pygame.image.load('пуля.png')
+ALIEN0 = pygame.image.load('инопланятян_1.png')
+ALIEN1 = pygame.image.load('инопланятян_2.png')
+
+SPLASH = pygame.image.load('частици.png')
+SPLASH0 = pygame.transform.scale(SPLASH, (100, 100))
+CRACK = pygame.image.load('частици.png')
+CRACK0 = pygame.transform.scale(CRACK, (100, 100))
+
+LASER = pygame.image.load('ласер.png')
+LASER0 = pygame.transform.scale(LASER, (100, 100))
+
+class SpaceWars:
+
+    def init (self, window_title="SpaceWars", fps=60, init_lifes=3, enemies=3, invincible=False):
+        super().__init__()
+
+        self.score = 0
+        self.init_lifes = init_lifes
+        self.lifes = init_lifes
+        self.invincible = invincible
+
+        self.start_time = time.time ()
+        self.anim_run = True
+        self.game_over = False
+        self.fps = fps
+
+        self.num_bg_stars = 100
+        self.num_flystars = 10
+
+        self.num_enemies = enemies
+
+        self.has_been_hit = False
+        self.hit_time = 0
+        self.screen_shake = False
+
+        self.warp_mode = False
+
+        #Настройте пайгейма
+        self.input_mode = 'joy'
+        pygame.init ()
+        try:
+            self.joystick = pygame.joystick.Joystick(0)
+        except pygame.error:
+            print("No gamepad present, please use keyboard!")
+            self.input_mode = 'key'
+
+        #Настройте окна
+        self.window = pygame.display.set_mode ((WINDOWWIDTH, WINDOWHEIGHT), 0, 32)
+        pygame.display.set_caption (window_title)
+
+        self.clock = pygame.time.Clock ()
+
+        #изменения курсора
+        pygame.mouse.set_visible(False)
+
+        self.init_time = time.time()
+
+        self.init_objects()
+        self.runLoop()
+
+    def init_objects(self):
+        self.init_time = time.time()
+        self.anim_run = True
+        self.game_over = False
+        self.lifes = self.init_lifes
+        self.score = 0
+
+        #Разние Объекты 
+
+        self.ship = pygame.sprite.Group()
+        self.myship = Ship()
+        self.ship.add(self.myship)
+
+        self.rockets = pygame.sprite.Group()
+        
+        self.background_stars = pygame.sprite.Group()
+        for i in range(self.num_bg_stars):
+            self.background_stars.add(BackgroundStar(random.randint(0, WINDOWWIDTH), random.randint(0, WINDOWHEIGHT)))
+
+        self.flying_bg_stars = pygame.sprite.Group()
+        for i in range(self.num_flystars):
+            self.flying_bg_stars.add(FlyingBackgroundStar())
+            
+        self.enemy_objects = pygame.sprite.Group()
+        for i in range(self.num_enemies):
+            self.enemy_objects.add(EnemyObject())
+
+        self.explosions = pygame.sprite.Group()
+
+        self.overlays = pygame.sprite.Group()
+
+        self.time_elapsed_since_last_shake = 0
+
+
+    def runLoop(self):
+
+        #Запустк циклов игры/анимаций
+        while True:
+#!Экран Game Over и обработка событий
+            if self.game_over:
+                time.sleep(2)
+                self.game_over_screen()
+                while self.game_over:
+                    for event in pygame.event.get():
+                        if event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_ESCAPE:
+                                pygame.quit()
+                                sys.exit()
+                            if event.key == pygame.K_y:
+                                self.init_objects()
+                                break
+                            if event.key == pygame.K_n:
+                                pygame.quit()
+                                sys.exit()
+
+            #!Управления игроквими собитиями
+            for event in pygame.event.get ():
+                #print(event)
+                if event.type == QUIT:
+                    pygame.quit ()
+                    sys.exit ()
+
+                #!Настройки Клавиш
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit ()
+                        sys.exit ()
+                    if event.key == pygame.K_p:
+                        if self.anim_run == False:
+                            self.anim_run = True
+                        else:
+                            self.anim_run = False
+                    if event.key == pygame.K_r:
+                        self.init_objects()
+                    if event.key == pygame.K_w:
+                        if not self.warp_mode:
+                            self.init_warp_mode()
+
+                    if event.key == pygame.K_KP_PLUS:
+                        if self.fps < 60:
+                            self.fps += 1
+                    if event.key == pygame.K_KP_MINUS:
+                        self.fps -= 1
+
+
+#!Кнопка огня
+                    if event.type == pygame.JOYBUTTONDOWN:
+                        self.mouse_down = True
+                    if self.mouse_down:
+                        if event.type == pygame.JOYBUTTONUP:
+                            self.rockets.add(
+                                Rocket(self.myship.rect.x-50, self.myship.rect.y + 75,
+                                       self.rocket_size))
+                            self.rockets.add(
+                                Rocket(self.myship.rect.x + WINDOWWIDTH/2-50, self.myship.rect.y + 75,
+                                       self.rocket_size))
+                            self.rocket_size = 1
+                            self.mouse_down = False
+
+                #!Ввод с клави
+                elif self.input_mode == 'key':
+
+                    if event.type == pygame.KEYDOWN:
+                        #пуля
+                        if event.key == pygame.K_SPACE:
+                            self.rockets.add(
+                                Rocket(self.myship.rect.x, WINDOWHEIGHT
+                                       ))
+                            self.rockets.add(
+                                Rocket(self.myship.rect.x + WINDOWWIDTH / 2, WINDOWHEIGHT
+                                       ))
+                            self.mouse_down = True
+
+                        #полет
+                        if event.key == pygame.K_RIGHT:
+                            x_val = -2
+                            for star in self.background_stars:
+                                star.x_speed = x_val * 3
+
+                            for star in self.enemy_objects:
+                                star.x_speed = x_val * 3
+
+                            self.myship.is_horizontal_breaking = False
+                        elif event.key == pygame.K_LEFT:
+                            x_val = 2
+                            for star in self.background_stars:
+                                star.x_speed = x_val * 3
+                            for star in self.enemy_objects:
+                                star.x_speed = x_val * 3
+
+                            self.myship.is_horizontal_breaking = False
+
+                        if event.key == pygame.K_UP:
+                            y_val = -2
+                            for star in self.background_stars:
+                                star.y_speed = y_val * 3
+                            for star in self.enemy_objects:
+                                star.y_speed = y_val * 3
+                            self.myship.is_vertical_breaking = False
+                        elif event.key == pygame.K_DOWN:
+                            y_val = 2
+                            for star in self.background_stars:
+                                star.y_speed = y_val * 3
+                            for star in self.enemy_objects:
+                                star.y_speed = y_val * 3
+                            self.myship.is_vertical_breaking = False
+
+
+                    if event.type == pygame.KEYUP:
+
+                        #пуля
+                        if event.key == pygame.K_SPACE and self.mouse_down:
+                            pass
+                        #настройки полета
+                        if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                            self.myship.is_horizontal_breaking = True
+                        if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+                            self.myship.is_vertical_breaking = True
+
+            #запустить/приостановить анимацию
+            if self.anim_run:
+
+                if self.lifes <= 0:
+                    self.game_over = True
+                    self.anim_run = False
+                    print("Game Over!")
+#!Обновления объектов
+                self.background_stars.update(self.myship.is_vertical_breaking, self.myship.is_horizontal_breaking)
+                self.flying_bg_stars.update()
+                self.enemy_objects.update(self.myship.rect, self.window)
+                self.rockets.update()
+                self.explosions.update()
+                self.overlays.update()
+
+                #Колизия
+                for enemy in self.enemy_objects:
+                    for rocket in self.rockets:
+                        if enemy.rect.colliderect(rocket.rect) and enemy.rect.colliderect(self.myship.inner_rect):
+                            for i in range(int(enemy.size/4)):
+                                explosion = Explosion(enemy.rect.x, enemy.rect.y, enemy.color)
+                                self.explosions.add(explosion)
+                            if enemy.distance <= 100:
+                                splash = Splash(enemy.rect.x, enemy.rect.y, enemy.size)
+                                self.overlays.add(splash)
+                            self.enemy_objects.remove(enemy)
+                            self.enemy_objects.add(EnemyObject())
+                            self.score += 100
+                            rocket.remove(self.rockets)
+
+                for rocket in self.rockets:
+                    if rocket.life < 1 or rocket.rect.y < WINDOWHEIGHT/2:
+                        self.rockets.remove(rocket)
+
+                self.myship.is_locked_by_enemy = False
+
+                #!Столкновения С врагом
+                for enemy in self.enemy_objects:
+                    if enemy.distance <= 0:
+                        if enemy.rect.colliderect(self.myship.rect) and not self.has_been_hit and not self.invincible:
+                            self.has_been_hit = True
+                            self.hit_time = time.time()
+                            self.lifes -= 1
+                            self.enemy_objects.remove(enemy)
+                            self.enemy_objects.add(EnemyObject())
+                            crack = Crack(enemy.rect.x, enemy.rect.y)
+                            self.overlays.add(crack)
+                        else:
+                            enemy.set_fly_by_mode()
+                    if enemy.distance < 100:
+                        if enemy.rect.colliderect(self.myship.rect):
+                            enemy.image = pygame.transform.scale(ALIEN1, (enemy.rect.w, enemy.rect.h))
+                            self.myship.is_locked_by_enemy = True
+                    if enemy.distance < -50:
+                        self.enemy_objects.remove(enemy)
+                        self.enemy_objects.add(EnemyObject())
+
+                for star in self.flying_bg_stars:
+                    if star.distance <= 0:
+                        self.flying_bg_stars.remove(star)
+                        self.flying_bg_stars.add(FlyingBackgroundStar())
+
+                for explosion in self.explosions:
+                    if explosion.life < 1:
+                        self.explosions.remove(explosion)
+
+                for item in self.overlays:
+                    if item.life <= 0:
+                        self.overlays.remove(item)
+
+                #Рисовка
+                self.window.fill (BLACK)               
+                self.background_stars.draw(self.window)
+                self.flying_bg_stars.draw(self.window)
+                self.enemy_objects.draw(self.window)
+                self.explosions.draw(self.window)
+                self.rockets.draw(self.window)
+                self.overlays.draw(self.window)
+                self.myship.draw(self.window)
+
+                self.draw_infos()
+
+if time.time() > self.hit_time + 1:
+                    self.has_been_hit = False
+if self.has_been_hit:
+                    self.time_elapsed_since_last_shake += dt
+                    # dt is measured in milliseconds, therefore 250 ms = 0.25 seconds
+                    if self.time_elapsed_since_last_shake > 100:
+                        self.draw_has_been_hit_screen ()
+
+                #!Нарисованое Окно
+pygame.display.update ()
+
+dt = self.clock.tick (self.fps)
+
+self.game_over_screen()
+
+
+def init_warp_mode(self):
+        for enemy in self.enemy_objects:
+            enemy.set_fly_by_mode(multi=2)
+        for star in self.background_stars:
+            self.background_stars.remove(star)
+
+
+def draw_has_been_hit_screen(self):
+
+        pygame.draw.lines(self.window, RED, True,
+                          [(0, 0), (WINDOWWIDTH, 0), (WINDOWWIDTH, WINDOWHEIGHT), (0, WINDOWHEIGHT)], 5)
+
+        if self.screen_shake:
+            delta = 10
+            self.screen_shake = False
+        else:
+            delta = -10
+            self.screen_shake = True
+
+        for star in self.background_stars:
+            star.rect.x += delta
+        for star in self.flying_bg_stars:
+            star.rect.x += delta
+        for star in self.enemy_objects:
+            star.rect.x += delta
+        for star in self.explosions:
+            star.rect.x += delta
+
+        pygame.display.update()
+
+def draw_infos(self):
+        font = pygame.font.SysFont("Arial", 18)
+
+        text = "Score: " + str(self.score)
+        renderText = font.render(text, True, WHITE)
+        self.window.blit(renderText, (30, WINDOWHEIGHT - 60))
+
+        text = "Lifes: " + str(self.lifes)
+        renderText = font.render(text, True, WHITE)
+        self.window.blit(renderText, (30, WINDOWHEIGHT - 30))
+
+        text = "fps: " + str(int(self.clock.get_fps())) + " (" + str(self.fps) + ")"
+        renderText = font.render(text, True, WHITE)
+        self.window.blit(renderText, (WINDOWWIDTH - 100, WINDOWHEIGHT - 30))
+
+def game_over_screen (self):
+        try:
+            with open("highscore.txt", "r") as hs_file:
+                hs = int(hs_file.read())
+        except Exception as e:
+            hs = 0
+
+        with open("highscore.txt", "w") as hs_file:
+            if self.score > hs:
+                new_hs = self.score
+                print("New High Score!")
+            else:
+                new_hs = hs
+            hs_file.write(str(new_hs))
+
+        self.window.fill (BLACK)
+
+        font = pygame.font.SysFont ("Arial", 36)
+        text = "GAME OVER"
+        renderText = font.render (text, True, WHITE)
+        self.window.blit (renderText, (WINDOWWIDTH / 3, WINDOWHEIGHT / 2 - 100))
+
+        if self.score > hs:
+            text = "NEW HIGH SCORE!!!"
+            renderText = font.render(text, True, WHITE)
+            self.window.blit(renderText, (WINDOWWIDTH / 3, WINDOWHEIGHT / 2 - 50))
+
+        font = pygame.font.SysFont ("Arial", 18)
+        text = "Your score: " + str (self.score)
+        renderText = font.render (text, True, WHITE)
+        self.window.blit (renderText, (WINDOWWIDTH / 3, WINDOWHEIGHT / 2 + 50))
+
+        font = pygame.font.SysFont ("Arial", 18)
+        text = "Play again? Yes (Y) / No (N)"
+        renderText = font.render (text, True, WHITE)
+        self.window.blit (renderText, (WINDOWWIDTH / 3, WINDOWHEIGHT / 2 + 100))
+
+        pygame.draw.lines (self.window, RED, True,
+                           [(0, 0), (WINDOWWIDTH, 0), (WINDOWWIDTH, WINDOWHEIGHT), (0, WINDOWHEIGHT)], 5)
+
+        pygame.display.update ()
+class BackgroundStar(Sprite):
+    def init (self, x_pos, y_pos):
+        super(BackgroundStar, self).init()
+        self.base_speed = 0
+        self.x_speed = self.base_speed
+        self.y_speed = self.base_speed
+        self.size = random.randint(1,2)
+        self.image = pygame.Surface([self.size, self.size])
+        self.image.fill(WHITE)
+        self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
+
+    def update(self, is_vertical_breaking, is_horizontal_breaking):
+        if is_vertical_breaking:
+            if self.y_speed < 0:
+                self.y_speed += 0.1
+            elif self.y_speed > 0:
+                self.y_speed -= 0.1
+        if is_horizontal_breaking:
+            if self.x_speed < 0:
+                self.x_speed += 0.1
+            elif self.x_speed > 0:
+                self.x_speed -= 0.1
+
+        self.rect.y += self.y_speed
+        self.rect.x += self.x_speed
+
+        if self.rect.y > WINDOWHEIGHT-1 or self.rect.y <= 0 or self.rect.x > WINDOWWIDTH-1 or self.rect.x < 0:
+            self.rect.y = random.randint(0, WINDOWHEIGHT)
+            self.rect.x = random.randint(0, WINDOWWIDTH)
+
+
+class FlyingBackgroundStar(Sprite):
+    def init (self):
+        super(FlyingBackgroundStar, self).init()
+
+        self.size = random.randint(1,5)
+        self.image = pygame.Surface([self.size, self.size])
+        self.image.fill(WHITE)
+        self.rect = pygame.Rect(int(random.randint(int(WINDOWWIDTH/3), int(WINDOWWIDTH/3*2))), int(random.randint(int(WINDOWHEIGHT/3), int(WINDOWHEIGHT/3*2))), self.size, self.size)
+        self.distance = random.randint(50,100)
+
+        if self.rect.x > WINDOWWIDTH / 2:
+            self.x_speed = random.randint(2,10)
+        else:
+            self.x_speed = -random.randint(2,10)
+        if self.rect.y > WINDOWHEIGHT / 2:
+            self.y_speed = random.randint(2,10)
+        else:
+            self.y_speed = -random.randint(2,10)
+
+    def update(self):
+        self.distance -= 1
+        self.rect.x += self.x_speed
+        self.rect.y += self.y_speed
+
+
+class Ship(Sprite):
+    def init (self):
+        super(Ship, self).init()
+        self.rect = pygame.Rect(int(WINDOWWIDTH / 4), int(WINDOWHEIGHT/4), WINDOWWIDTH/2, WINDOWHEIGHT/2)
+        self.outer_rect = pygame.Rect(0, 0, WINDOWWIDTH, WINDOWHEIGHT)
+        self.inner_rect = pygame.Rect(int(WINDOWWIDTH / 10*4.5), int(WINDOWHEIGHT / 10*4.5), WINDOWWIDTH / 10, WINDOWHEIGHT / 10)
+        self.is_vertical_breaking = True
+        self.is_horizontal_breaking = True
+        self.is_locked_by_enemy = False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, WHITE, self.outer_rect, width=2)
+
+        # INNER
+        if self.is_locked_by_enemy:
+            pygame.draw.rect(screen, RED, self.rect, width=2)
+        else:
+            pygame.draw.rect(screen, WHITE, self.rect, width=2)
+
+        #!Рамки
+        pygame.draw.line(screen, WHITE, (0, 0),
+                         (int(WINDOWWIDTH / 4), int(WINDOWHEIGHT / 4)), width=2)
+        pygame.draw.line(screen, WHITE, (0, WINDOWHEIGHT - 1),
+                         (int(WINDOWWIDTH / 4), int(WINDOWHEIGHT / 4 * 3)), width=2)
+        pygame.draw.line(screen, WHITE, (WINDOWWIDTH, 0),
+                         (int(WINDOWWIDTH / 4 * 3), int(WINDOWHEIGHT / 4)), width=2)
+        pygame.draw.line(screen, WHITE, (WINDOWWIDTH, WINDOWHEIGHT - 1),
+                         (int(WINDOWWIDTH / 4 * 3), int(WINDOWHEIGHT / 4 * 3)), width=2)
+class Rocket(Sprite):
+    def init (self, x_pos, y_pos):
+        super(Rocket, self).init()
+        self.y_speed = 10
+        if x_pos > WINDOWHEIGHT / 2:
+            self.x_speed = 7
+        else:
+            self.x_speed = -7
+        self.life = 50
+        self.size = 50
+        self.rect = pygame.Rect(x_pos, y_pos, self.life, self.life)
+        self.image = pygame.transform.scale(LASER0, (self.size, self.size))
+        if x_pos < WINDOWHEIGHT/2:
+            self.image = pygame.transform.rotate(self.image, -35)
+        else:
+            self.image = pygame.transform.rotate(self.image, 35)
+
+    def update(self):
+        self.life -= 1
+        self.size -= 1
+
+        # update position
+        self.rect.y -= self.y_speed
+        self.rect.x -= self.x_speed
+
+        #decrease laser size
+        self.rect.w, self.rect.h = self.size, self.size
+
+
+        """
+        self.image.fill(self.colors[4-int(self.life/10)])
+        """
+
+class EnemyObject(Sprite):
+    def init (self):
+        super(EnemyObject, self).init()
+        self.color = (0,0,0)
+
+        self.size = random.randint(0,10)
+
+        self.alien_img_0 = pygame.transform.scale(ALIEN0, (self.size, self.size))
+        self.alien_img_1 = pygame.transform.scale(ALIEN1, (self.size, self.size))
+
+        self.image = self.alien_img_0
+        self.rect = pygame.Rect(random.randint(0, WINDOWWIDTH), random.randint(0, WINDOWHEIGHT), self.size, self.size)
+
+        self.distance = 300 
+        self.max_size = 150
+        self.step = random.randint(1,1)
+
+        if self.rect.x > WINDOWWIDTH / 2:
+            self.x_speed = -self.step
+        else:
+            self.x_speed = self.step
+        if self.rect.y > WINDOWHEIGHT / 2:
+            self.y_speed = -self.step
+        else:
+            self.y_speed = self.step
+
+    def update(self, ship_rect, screen):
+        self.distance -= self.step
+
+        self.rect.x += self.x_speed
+        self.rect.y += self.y_speed
+
+        if self.rect.w < self.max_size:
+            self.rect.w += self.step
+            self.rect.h += self.step
+            self.size += self.step
+
+            self.image = pygame.transform.scale(ALIEN0, (self.rect.w, self.rect.h))
+
+
+
+
+    def set_fly_by_mode(self, multi=1):
+        if self.rect.x > WINDOWWIDTH / 2:
+            self.x_speed = 10*multi
+        else:
+            self.x_speed = -10*multi
+        if self.rect.y > WINDOWHEIGHT / 2:
+            self.y_speed = 10*multi
+        else:
+            self.y_speed = -10*multi
+
+
+class Explosion(Sprite):
+    def init (self, init_x_pos, init_y_pos, color):
+        super(Explosion, self).init()
+        self.color = color
+        self.size = random.randint(10, 20)
+        self.y_speed = random.randint(-20, 20)
+        self.x_speed = random.randint(-20, 20)
+        self.x_pos = init_x_pos
+        self.y_pos = init_y_pos
+        self.life = random.randint(10,30)
+
+        self.image = FIRE0
+        self.image = pygame.transform.scale(self.image, (self.size, self.size))
+
+        self.rect = pygame.Rect(init_x_pos, init_y_pos, self.size, self.size)
+
+def update(self):
+        self.rect.x += self.y_speed
+        self.rect.y += self.x_speed
+        self.life -= 1
+
+
+        self.x_speed *= 0.95
+        self.y_speed *= 0.95
+
+
+class Splash(Sprite):
+    def init (self, x_pos, y_pos, size):
+        super(Splash, self).init()
+        self.life = random.randint(30, 60)  
+        self.image = pygame.transform.rotate(SPLASH0, random.randint(0,360))
+        self.size = size
+        self.image = pygame.transform.scale(self.image, (self.size, self.size))
+        self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
+
+    def update(self):
+        self.life -= 1
+
+
+class Crack(Sprite):
+    def init(self, x_pos, y_pos):
+        super(Crack, self).init()
+        self.image = pygame.transform.rotate(CRACK0, random.randint(0, 360))
+        self.size = 100
+        self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
+        self.life = 100
+
+
+if name == "main":
+    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
