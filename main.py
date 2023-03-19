@@ -640,6 +640,6 @@ class Crack(Sprite):
         self.life = 100
 
 
-if __name__ == "menu":
-    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
+    if __name__ == "__main__":    
+        space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
         
