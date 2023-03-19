@@ -32,7 +32,7 @@ LASER0 = pygame.transform.scale(LASER, (100, 100))
 
 class SpaceWars:
 
-    def init (self, window_title="SpaceWars", fps=60, init_lifes=3, enemies=3, invincible=False):
+    def __init__ (self, window_title="SpaceWars", fps=60, init_lifes=3, enemies=3, invincible=False):
         super().__init__()
 
         self.score = 0
@@ -58,7 +58,7 @@ class SpaceWars:
 
         #Настройте пайгейма
         self.input_mode = 'joy'
-        pygame.init ()
+        pygame.__init__ ()
         try:
             self.joystick = pygame.joystick.Joystick(0)
         except pygame.error:
@@ -423,8 +423,8 @@ class SpaceWars:
 
         pygame.display.update ()
 class BackgroundStar(Sprite):
-    def init (self, x_pos, y_pos):
-        super(BackgroundStar, self).init()
+    def __init__ (self, x_pos, y_pos):
+        super(BackgroundStar, self).__init__()
         self.base_speed = 0
         self.x_speed = self.base_speed
         self.y_speed = self.base_speed
@@ -454,8 +454,8 @@ class BackgroundStar(Sprite):
 
 
 class FlyingBackgroundStar(Sprite):
-    def init (self):
-        super(FlyingBackgroundStar, self).init()
+    def __init__ (self):
+        super(FlyingBackgroundStar, self).__init__()
 
         self.size = random.randint(1,5)
         self.image = pygame.Surface([self.size, self.size])
@@ -479,8 +479,8 @@ class FlyingBackgroundStar(Sprite):
 
 
 class Ship(Sprite):
-    def init (self):
-        super(Ship, self).init()
+    def __init__ (self):
+        super(Ship, self).__init__()
         self.rect = pygame.Rect(int(WINDOWWIDTH / 4), int(WINDOWHEIGHT/4), WINDOWWIDTH/2, WINDOWHEIGHT/2)
         self.outer_rect = pygame.Rect(0, 0, WINDOWWIDTH, WINDOWHEIGHT)
         self.inner_rect = pygame.Rect(int(WINDOWWIDTH / 10*4.5), int(WINDOWHEIGHT / 10*4.5), WINDOWWIDTH / 10, WINDOWHEIGHT / 10)
@@ -507,8 +507,8 @@ class Ship(Sprite):
         pygame.draw.line(screen, WHITE, (WINDOWWIDTH, WINDOWHEIGHT - 1),
                          (int(WINDOWWIDTH / 4 * 3), int(WINDOWHEIGHT / 4 * 3)), width=2)
 class Rocket(Sprite):
-    def init (self, x_pos, y_pos):
-        super(Rocket, self).init()
+    def __init__ (self, x_pos, y_pos):
+        super(Rocket, self).__init__()
         self.y_speed = 10
         if x_pos > WINDOWHEIGHT / 2:
             self.x_speed = 7
@@ -540,8 +540,8 @@ class Rocket(Sprite):
         """
 
 class EnemyObject(Sprite):
-    def init (self):
-        super(EnemyObject, self).init()
+    def __init__ (self):
+        super(EnemyObject, self).__init__()
         self.color = (0,0,0)
 
         self.size = random.randint(0,10)
@@ -593,8 +593,8 @@ class EnemyObject(Sprite):
 
 
 class Explosion(Sprite):
-    def init (self, init_x_pos, init_y_pos, color):
-        super(Explosion, self).init()
+    def __init__ (self, init_x_pos, init_y_pos, color):
+        super(Explosion, self).__init__()
         self.color = color
         self.size = random.randint(10, 20)
         self.y_speed = random.randint(-20, 20)
@@ -619,8 +619,8 @@ class Explosion(Sprite):
 
 
 class Splash(Sprite):
-    def init (self, x_pos, y_pos, size):
-        super(Splash, self).init()
+    def __init__ (self, x_pos, y_pos, size):
+        super(Splash, self).__init__()
         self.life = random.randint(30, 60)  
         self.image = pygame.transform.rotate(SPLASH0, random.randint(0,360))
         self.size = size
@@ -632,13 +632,14 @@ class Splash(Sprite):
 
 
 class Crack(Sprite):
-    def init(self, x_pos, y_pos):
-        super(Crack, self).init()
+    def __init__(self, x_pos, y_pos):
+        super(Crack, self).__init__()
         self.image = pygame.transform.rotate(CRACK0, random.randint(0, 360))
         self.size = 100
         self.rect = pygame.Rect(x_pos, y_pos, self.size, self.size)
         self.life = 100
 
 
-        if name == "menu":
-            space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
+if __name__ == "menu":
+    space = SpaceWars(fps=60, init_lifes=5, enemies=5, invincible=False)
+        
